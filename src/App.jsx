@@ -13,13 +13,14 @@ import ProductDetail from "./pages/frontpages/ProductDetail";
 import Cart from "./pages/frontpages/Cart";
 import Checkout from "./pages/frontpages/Checkout";
 import Register from "./pages/frontpages/Register";
-import Login from "./pages/frontpages/Login";
+import Login from "./pages/frontpages/Login";   
 
 // Adminpages
 import AdminDashboard from "./pages/adminpages/AdminDashboard";
 import AboutPage from "./pages/adminpages/AboutPage";
 import ProductForm from "./pages/adminpages/ProductForm";
 import ProductEdit from "./pages/adminpages/ProductEdit";
+
 
 export default function App() {
   return (

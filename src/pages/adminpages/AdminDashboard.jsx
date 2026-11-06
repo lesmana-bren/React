@@ -1,205 +1,294 @@
-import { useContext, useState } from "react";
-import { ShopContext } from "../../context/ShopContext";
+import React, { useState } from "react";
+import { useProducts } from "../../utils/ProductContext";
+import toast from "react-hot-toast";
+import { useQuery } from "@tanstack/react-query";
 
 export default function AdminDashboard() {
-  const { products, addProduct, updateStock, deleteProduct } = useContext(ShopContext);
+  const { products, isLoading, isError, addProduct, updateProduct, deleteProduct, getCategories } = useProducts();
 
+  // State untuk Modal Pop-up
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEdit, setIsEdit] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
+
+  // State Form
   const [formData, setFormData] = useState({
     name: "",
-    category: "RAM",
     price: "",
     stock: "",
-    image: "",
+    category_id: "",
     description: "",
-    specs: "",
+    img: null,
+  });
+  const [errors, setErrors] = useState({});
+
+  // Fetch Kategori untuk pilihan dropdown di Modal
+  const { data: categories = [] } = useQuery({
+    queryKey: ["categories"],
+    queryFn: getCategories,
   });
 
-  const handleAddProduct = (e) => {
-    e.preventDefault();
-    if (!formData.name || !formData.price || !formData.stock) {
-      return alert("Mohon isi semua field yang wajib!");
-    }
+  // Handle Buka Modal Tambah
+  const handleOpenAdd = () => {
+    setIsEdit(false);
+    setSelectedId(null);
+    setFormData({ name: "", price: "", stock: "", category_id: "", description: "", img: null });
+    setErrors({});
+    setIsModalOpen(true);
+  };
 
-    addProduct({
-      ...formData,
-      image:
-        formData.image ||
-        "https://images.unsplash.com/photo-1591799264318-7e6ef8ddb7ea?auto=format&fit=crop&w=600&q=80",
-    });
-
-    alert("Produk berhasil ditambahkan!");
+  // Handle Buka Modal Edit
+  const handleOpenEdit = (product) => {
+    setIsEdit(true);
+    setSelectedId(product.id);
     setFormData({
-      name: "",
-      category: "RAM",
-      price: "",
-      stock: "",
-      image: "",
-      description: "",
-      specs: "",
+      name: product.name || "",
+      price: product.price || "",
+      stock: product.stock || "",
+      category_id: product.category_id || "",
+      description: product.description || "",
+      img: product.img_url || null,
+    });
+    setErrors({});
+    setIsModalOpen(true);
+  };
+
+  // Handle Input Form
+  const handleChange = (e) => {
+    const { name, value, files } = e.target;
+    setFormData({
+      ...formData,
+      [name]: files ? files[0] : value,
     });
   };
 
+  // Handle Submit Form (Tambah & Edit)
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrors({});
+
+    const data = new FormData();
+    Object.entries(formData).forEach(([key, value]) => {
+      if (value !== null) data.append(key, value);
+    });
+
+    try {
+      if (isEdit) {
+        await updateProduct(selectedId, data);
+        toast.success("Produk berhasil diperbarui!");
+      } else {
+        await addProduct(data);
+        toast.success("Produk berhasil ditambahkan!");
+      }
+      setIsModalOpen(false); // Tutup Modal
+    } catch (error) {
+      if (error.response?.status === 422) {
+        setErrors(error.response.data.errors);
+        toast.error("Periksa kembali data yang dimasukkan.");
+      } else {
+        toast.error("Gagal menyimpan produk.");
+      }
+    }
+  };
+
+  // Handle Hapus Produk
+  const handleDelete = async (id) => {
+    if (!window.confirm("Apakah kamu yakin ingin menghapus produk ini?")) return;
+    try {
+      await deleteProduct.mutateAsync(id);
+      toast.success("Produk berhasil dihapus!");
+    } catch (error) {
+      toast.error("Gagal menghapus produk.");
+    }
+  };
+
+  if (isLoading) return <p className="p-4">Memuat data produk...</p>;
+  if (isError) return <p className="p-4 text-red-500">Gagal mengambil data dari API Laravel.</p>;
+
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-gray-800">Dashboard Manajemen Stok RAM & SSD</h1>
-
-      {/* Form Tambah Barang */}
-      <div className="bg-white p-6 rounded-xl border shadow-sm">
-        <h2 className="text-lg font-bold text-gray-800 mb-4">+ Tambah Jenis Barang Baru</h2>
-        <form onSubmit={handleAddProduct} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Nama Produk *</label>
-            <input
-              type="text"
-              required
-              placeholder="Contoh: Kingston FURY 16GB DDR5"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Kategori *</label>
-            <select
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-            >
-              <option value="RAM">RAM</option>
-              <option value="SSD">SSD</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Harga (Rp) *</label>
-            <input
-              type="number"
-              required
-              placeholder="850000"
-              value={formData.price}
-              onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-              className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Stok Awal *</label>
-            <input
-              type="number"
-              required
-              placeholder="10"
-              value={formData.stock}
-              onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-              className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-gray-600 mb-1">URL Gambar (Opsional)</label>
-            <input
-              type="url"
-              placeholder="https://images.unsplash.com/..."
-              value={formData.image}
-              onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-              className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Deskripsi & Spesifikasi</label>
-            <textarea
-              rows="2"
-              placeholder="Deskripsi singkat produk..."
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            ></textarea>
-          </div>
-
-          <button
-            type="submit"
-            className="md:col-span-2 bg-blue-600 text-white font-bold py-2.5 rounded-lg hover:bg-blue-700 transition"
-          >
-            Simpan Produk Baru
-          </button>
-        </form>
+    <div className="p-4 bg-white rounded shadow">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-xl font-bold">Manajemen Produk</h1>
+        <button
+          onClick={handleOpenAdd}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+        >
+          + Tambah Produk
+        </button>
       </div>
 
-      {/* Tabel Kelola Stok */}
-      <div className="bg-white p-6 rounded-xl border shadow-sm overflow-x-auto">
-        <h2 className="text-lg font-bold text-gray-800 mb-4">Daftar Stok Produk</h2>
-
-        <table className="w-full text-left border-collapse min-w-[600px]">
-          <thead>
-            <tr className="border-b bg-gray-50 text-gray-600 text-xs uppercase">
-              <th className="p-3">Produk</th>
-              <th className="p-3">Kategori</th>
-              <th className="p-3">Harga</th>
-              <th className="p-3">Kelola Stok</th>
-              <th className="p-3 text-center">Aksi</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y text-sm">
-            {products.map((item) => (
-              <tr key={item.id} className="hover:bg-gray-50">
-                <td className="p-3 flex items-center gap-3">
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="w-10 h-10 object-cover rounded bg-gray-100"
-                  />
-                  <span className="font-semibold text-gray-800 line-clamp-1">{item.name}</span>
+      {/* TABEL DAFTAR PRODUK */}
+      <table className="table-auto w-full border">
+        <thead>
+          <tr className="bg-gray-100 text-left">
+            <th className="p-2 border">#</th>
+            <th className="p-2 border">Image</th>
+            <th className="p-2 border">Nama</th>
+            <th className="p-2 border">Harga</th>
+            <th className="p-2 border">Stok</th>
+            <th className="p-2 border">Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {products && products.length > 0 ? (
+            products.map((p, index) => (
+              <tr key={p.id}>
+                <td className="p-2 border">{index + 1}</td>
+                <td className="p-2 border">
+                  <img src={p.img_url} alt={p.name} className="w-16 h-16 object-cover rounded" />
                 </td>
-                <td className="p-3">
-                  <span className="bg-slate-100 text-slate-800 px-2 py-0.5 rounded text-xs font-semibold">
-                    {item.category}
-                  </span>
+                <td className="p-2 border">
+                  {p.name} <br />
+                  <small className="text-gray-500">#{p.category?.name || "No Category"}</small>
                 </td>
-                <td className="p-3 font-medium">Rp {item.price.toLocaleString("id-ID")}</td>
-
-                {/* Tombol Tambah/Kurang & Input Stok */}
-                <td className="p-3">
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => updateStock(item.id, item.stock - 1)}
-                      className="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded font-bold text-xs"
-                    >
-                      -
-                    </button>
-                    <input
-                      type="number"
-                      min="0"
-                      value={item.stock}
-                      onChange={(e) => updateStock(item.id, e.target.value)}
-                      className="w-16 p-1 border rounded text-center font-bold text-blue-600 outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button
-                      onClick={() => updateStock(item.id, item.stock + 1)}
-                      className="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded font-bold text-xs"
-                    >
-                      +
-                    </button>
-                  </div>
-                </td>
-
-                <td className="p-3 text-center">
+                <td className="p-2 border">Rp. {p.price}</td>
+                <td className="p-2 border">{p.stock}</td>
+                <td className="p-2 border space-x-2">
                   <button
-                    onClick={() => {
-                      if (confirm(`Hapus produk ${item.name}?`)) {
-                        deleteProduct(item.id);
-                      }
-                    }}
-                    className="bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1 rounded text-xs font-bold transition"
+                    onClick={() => handleOpenEdit(p)}
+                    className="text-blue-600 hover:underline cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDelete(p.id)}
+                    className="text-red-600 hover:underline cursor-pointer"
                   >
                     Hapus
                   </button>
                 </td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            ))
+          ) : (
+            <tr>
+              <td colSpan="6" className="p-4 text-center text-gray-500">
+                Belum ada data produk di database API Laravel.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+
+      {/* MODAL POP-UP (TAMBAH / EDIT PRODUK) */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl p-6 shadow-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b pb-3 mb-4">
+              <h2 className="text-lg font-bold text-gray-800">
+                {isEdit ? "Edit Produk" : "Tambah Produk Baru"}
+              </h2>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nama Produk</label>
+                <input
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  placeholder="Nama Produk"
+                  className="w-full border rounded-md p-2"
+                />
+                {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name[0]}</p>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
+                <select
+                  name="category_id"
+                  value={formData.category_id}
+                  onChange={handleChange}
+                  className="w-full border rounded-md p-2"
+                  >
+                  <option value="">-- Pilih Kategori --</option>
+                  {Array.isArray(categories) &&
+                    categories.map((cat) => (
+                      <option key={cat.id || cat.category_id} value={cat.id || cat.category_id}>
+                        {cat.name || cat.category}
+                      </option>
+                    ))}
+                </select>
+                {errors.category_id && (
+                  <p className="text-red-500 text-sm mt-1">{errors.category_id[0]}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Harga</label>
+                  <input
+                    type="number"
+                    name="price"
+                    value={formData.price}
+                    onChange={handleChange}
+                    placeholder="Harga"
+                    className="w-full border rounded-md p-2"
+                  />
+                  {errors.price && <p className="text-red-500 text-sm mt-1">{errors.price[0]}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Stok</label>
+                  <input
+                    type="number"
+                    name="stock"
+                    value={formData.stock}
+                    onChange={handleChange}
+                    placeholder="Stok"
+                    className="w-full border rounded-md p-2"
+                  />
+                  {errors.stock && <p className="text-red-500 text-sm mt-1">{errors.stock[0]}</p>}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi</label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  rows="3"
+                  placeholder="Deskripsi produk"
+                  className="w-full border rounded-md p-2"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Gambar Produk</label>
+                <input
+                  type="file"
+                  name="img"
+                  accept="image/*"
+                  onChange={handleChange}
+                  className="w-full border rounded-md p-2 text-sm"
+                />
+                {errors.img && <p className="text-red-500 text-sm mt-1">{errors.img[0]}</p>}
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 border rounded-md hover:bg-gray-100"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  {isEdit ? "Simpan Perubahan" : "Tambah Produk"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
